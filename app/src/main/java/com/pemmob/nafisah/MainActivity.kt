@@ -13,6 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.pemmob.nafisah.ui.screen.BasicInfoScreen
+import com.pemmob.nafisah.ui.screen.DaftarProductScreen
 import com.pemmob.nafisah.ui.screen.HubungiKamiScreen
 import com.pemmob.nafisah.ui.theme.JualanTheme
 
@@ -55,6 +56,10 @@ fun AppNavigation() {
             HubungiKamiScreen(
                 navController = navController
             )
+        }
+
+        composable("product_screen") {
+            DaftarProductScreen()
         }
     }
 }
