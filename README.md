@@ -1,3 +1,5 @@
+
+https://github.com/user-attachments/assets/ce1dd08c-1919-4d49-9b3a-f64a7e26e28a
 Nama: Nafisah Sekar Ayu
 NIM: H1D024087
 Shift Awal: H
@@ -14,6 +16,10 @@ Shift Akhir: D
 
 **PERTEMUAN 3**
 https://github.com/user-attachments/assets/a2632112-5ffb-4134-a9b4-3323bda512e9
+
+**PERTEMUAN4**
+https://github.com/user-attachments/assets/1a907753-16f7-45a5-8685-1bd9ffb9208f
+
 
 
 
