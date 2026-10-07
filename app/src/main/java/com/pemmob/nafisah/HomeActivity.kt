@@ -4,15 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.pemmob.nafisah.ui.screen.DaftarProductScreen
+import com.pemmob.nafisah.ui.screen.DaftarProdukScreen
 import com.pemmob.nafisah.ui.screen.DetailProductScreen
 import com.pemmob.nafisah.ui.screen.HubungiKamiScreen
 import com.pemmob.nafisah.ui.theme.JualanTheme
+import com.pemmob.nafisah.ui.viewmodel.ProductViewModel
 
 class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,34 +23,27 @@ class HomeActivity : ComponentActivity() {
         setContent {
             JualanTheme {
                 val navController = rememberNavController()
-                NavHost(
-                    navController = navController,
-                    startDestination = "daftar_produk"
-                ) {
-                    // ===== Route 1: Daftar Produk =====
-                    composable(route = "daftar_produk") {
-                        DaftarProductScreen(navController = navController)
-                    }
+                val productViewModel: ProductViewModel = viewModel()
 
-                    // ===== Route 2: Detail Produk (butuh productId) =====
+                NavHost(navController = navController, startDestination = "daftar_produk") {
+                    composable("daftar_produk") {
+                        DaftarProdukScreen(
+                            navController = navController,
+                            viewModel = productViewModel
+                        )
+                    }
                     composable(
                         route = "detail/{productId}",
-                        arguments = listOf(
-                            navArgument("productId") {
-                                type = NavType.IntType
-                            }
-                        )
+                        arguments = listOf(navArgument("productId") { type = NavType.IntType })
                     ) { backStackEntry ->
-                        // ✅ FIX: hapus "key = " pada getInt
                         val productId = backStackEntry.arguments?.getInt("productId") ?: 0
                         DetailProductScreen(
                             productId = productId,
-                            navController = navController
+                            navController = navController,
+                            viewModel = productViewModel
                         )
                     }
-
-                    // ===== Route 3: Hubungi Kami =====
-                    composable(route = "hubungi_kami") {
+                    composable("hubungi_kami") {
                         HubungiKamiScreen(navController = navController)
                     }
                 }

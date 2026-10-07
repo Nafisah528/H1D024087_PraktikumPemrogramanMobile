@@ -1,56 +1,57 @@
 package com.pemmob.nafisah.ui.screen
 
 import android.widget.Toast
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.pemmob.nafisah.R
-import com.pemmob.nafisah.data.dummy.DummyData
 import com.pemmob.nafisah.data.model.Product
 import com.pemmob.nafisah.ui.theme.Primary
-import kotlinx.coroutines.delay
+import com.pemmob.nafisah.ui.viewmodel.ProductUiState
+import com.pemmob.nafisah.ui.viewmodel.ProductViewModel
+import com.pemmob.nafisah.util.JualanConstants
 
 // ============================================================
 // STATEFUL COMPOSABLE (parent — mengelola state)
@@ -58,36 +59,47 @@ import kotlinx.coroutines.delay
 @Composable
 fun DetailProductScreen(
     productId: Int,
-    navController: NavController?
+    navController: NavController?,
+    viewModel: ProductViewModel
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    var quantity by remember { mutableStateOf(1) }
     val context = LocalContext.current
-    var isLoading by remember { mutableStateOf(true) }
-    var product by remember { mutableStateOf<Product?>(null) }
-    var quantity by rememberSaveable { mutableStateOf(1) }
 
-    // ===== Simulasi loading ambil data dari "server" =====
-    LaunchedEffect(key1 = productId) {
-        isLoading = true
-        delay(timeMillis = 1000)
-        product = DummyData.products.find { it.id == productId }
-        isLoading = false
-    }
-
-    // ===== Kirim state ke child =====
-    StatelessDetailProduct(
-        product = product,
-        isLoading = isLoading,
-        quantity = quantity,
-        onQuantityChange = { quantity = it },
-        onBackClick = { navController?.popBackStack() },
-        onAddToCartClick = {
-            Toast.makeText(
-                context,
-                "Ditambahkan: $quantity",
-                Toast.LENGTH_SHORT
-            ).show()
+    when (val state = uiState) {
+        is ProductUiState.Loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
         }
-    )
+        is ProductUiState.Error -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error)
+            }
+        }
+        is ProductUiState.Success -> {
+            val product = state.products.find { it.id == productId }
+            if (product == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Produk tidak ditemukan")
+                }
+            } else {
+                StatelessDetailProduct(
+                    product = product,
+                    quantity = quantity,
+                    onQuantityChange = { quantity = it },
+                    onBackClick = { navController?.popBackStack() },
+                    onAddToCartClick = {
+                        Toast.makeText(
+                            context,
+                            "Tambah ke keranjang sebanyak $quantity",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
+            }
+        }
+    }
 }
 
 // ============================================================
@@ -97,7 +109,6 @@ fun DetailProductScreen(
 @Composable
 fun StatelessDetailProduct(
     product: Product?,
-    isLoading: Boolean,
     quantity: Int,
     onQuantityChange: (Int) -> Unit,
     onBackClick: () -> Unit,
@@ -128,186 +139,94 @@ fun StatelessDetailProduct(
                 )
             )
         }
-    ) { innerPadding ->
-
-        // ===== Kondisi: Loading =====
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = Primary)
-            }
-        }
-
-        // ===== Kondisi: Produk ditemukan =====
-        else if (product != null) {
+    ) { paddingValues ->
+        if (product != null) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .background(Color(0xFFF5F5F5))
-                    .verticalScroll(state = rememberScrollState())
+                    .padding(paddingValues)
+                    .verticalScroll(rememberScrollState())
             ) {
-                // ===== Gambar Produk =====
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(280.dp)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_product_logo),
+                val imageModel: Any = if (product.img == "dummy_product") {
+                    R.drawable.dummy_product
+                } else {
+                    "${JualanConstants.BASE_URL}img/${product.img}"
+                }
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    AsyncImage(
+                        model = imageModel,
                         contentDescription = product.name,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.size(220.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White),
+                        contentScale = ContentScale.Fit
                     )
                 }
 
-                // ===== Info Produk =====
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(all = 16.dp)
-                ) {
-                    Text(
-                        text = product.name,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Rp ${product.price}",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Primary
-                    )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(product.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text("Rp ${product.price}", style = MaterialTheme.typography.titleLarge)
+                    Spacer(Modifier.height(16.dp))
+                    Text("Deskripsi", fontWeight = FontWeight.Bold)
+                    Text(product.description ?: "-")
+                    Text("Stok: ${product.stock}")
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Deskripsi",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = product.description ?: "-",
-                        fontSize = 14.sp,
-                        color = Color.DarkGray
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Stok: ${product.stock}",
-                        fontSize = 14.sp,
-                        color = Color.DarkGray
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // ===== Jumlah Beli =====
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .padding(all = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Jumlah Beli",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
+                    Spacer(Modifier.height(16.dp))
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Tombol minus
-                        FilledTonalIconButton(
-                            onClick = { if (quantity > 1) onQuantityChange(quantity - 1) },
-                            enabled = quantity > 1
-                        ) {
-                            Text(
-                                text = "-",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                        IconButton(onClick = { if (quantity > 1) onQuantityChange(quantity - 1) }) {
+                            Text("-")
                         }
-
-                        // Angka quantity
-                        Text(
-                            text = quantity.toString(),
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-
-                        // Tombol plus
-                        FilledTonalIconButton(
-                            onClick = {
-                                if (quantity < product.stock) onQuantityChange(quantity + 1)
-                            },
-                            enabled = quantity < product.stock
-                        ) {
-                            Text(
-                                text = "+",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Text(quantity.toString())
+                        IconButton(onClick = { onQuantityChange(quantity + 1) }) {
+                            Text("+")
                         }
                     }
+
+                    Button(onClick = onAddToCartClick, modifier = Modifier.fillMaxWidth()) {
+                        Text("Tambah ke Keranjang")
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // ===== Tombol Tambah ke Keranjang =====
-                Button(
-                    onClick = onAddToCartClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    enabled = product.stock > 0 && quantity > 0,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Primary
-                    )
-                ) {
-                    Text(
-                        text = "Tambah ke Keranjang",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+}
 
-        // ===== Kondisi: Produk tidak ditemukan =====
-        else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Produk tidak ditemukan.",
-                    color = Color.Gray,
-                    fontSize = 16.sp
+@Composable
+fun ProductItemCard(product: Product, onClick: () -> Unit = {}) {
+    Card(
+        modifier = Modifier
+            .padding(all = 8.dp)
+            .fillMaxWidth()
+            .clickable { onClick() },
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(all = 12.dp)) {
+            val imageModel: Any = if (product.img == "dummy_product") {
+                R.drawable.dummy_product
+            } else {
+                "${JualanConstants.BASE_URL}img/${product.img}"
+            }
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                AsyncImage(
+                    model = imageModel,
+                    contentDescription = product.name,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.White),
+                    contentScale = ContentScale.Fit
                 )
             }
+
+            Text(product.name, style = MaterialTheme.typography.titleMedium)
+            Text("Rp ${product.price}", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

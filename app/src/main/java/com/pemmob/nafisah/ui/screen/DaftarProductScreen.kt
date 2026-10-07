@@ -2,9 +2,6 @@ package com.pemmob.nafisah.ui.screen
 
 import android.content.res.Configuration
 import android.widget.Toast
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -25,8 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,7 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,78 +45,89 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.pemmob.nafisah.R
-import com.pemmob.nafisah.data.dummy.DummyData
 import com.pemmob.nafisah.data.model.Category
 import com.pemmob.nafisah.data.model.Product
 import com.pemmob.nafisah.ui.theme.JualanTheme
 import com.pemmob.nafisah.ui.theme.Primary
-import kotlinx.coroutines.delay
+import com.pemmob.nafisah.ui.viewmodel.ProductUiState
+import com.pemmob.nafisah.ui.viewmodel.ProductViewModel
 
 // ============================================================
 // STATEFUL COMPOSABLE (parent — mengelola state)
 // ============================================================
 @Composable
-fun DaftarProductScreen(
-    navController: NavController? = null
+fun DaftarProdukScreen(
+    navController: NavController? = null,
+    viewModel: ProductViewModel
 ) {
-    // ===== State =====
-    var selectedCategoryId by rememberSaveable {
-        mutableStateOf<Int?>(DummyData.categories.firstOrNull()?.id)
-    }
+    var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val uiState by viewModel.uiState.collectAsState()
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var filteredProducts by remember { mutableStateOf(emptyList<Product>()) }
 
-    // ===== Simulasi async loading (1 detik) =====
-    LaunchedEffect(key1 = selectedCategoryId, key2 = searchQuery) {
-        isLoading = true
-        delay(timeMillis = 1000)
-
-        val filteredByCategory = if (selectedCategoryId == null) {
-            DummyData.products
-        } else {
-            DummyData.products.filter { it.category_id == selectedCategoryId }
-        }
-
-        filteredProducts = if (searchQuery.isBlank()) {
-            filteredByCategory
-        } else {
-            filteredByCategory.filter {
-                it.name.contains(other = searchQuery, ignoreCase = true)
+    when (val state = uiState) {
+        is ProductUiState.Loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
         }
-
-        isLoading = false
-    }
-
-    // ===== Kirim state ke child =====
-    StatelessDaftarProduct(
-        categories = DummyData.categories,
-        selectedCategoryId = selectedCategoryId,
-        onCategorySelected = { id ->
-            // Toggle: klik kategori yang sama = reset
-            selectedCategoryId = if (selectedCategoryId == id) null else id
-        },
-        searchQuery = searchQuery,
-        onSearchQueryChange = { searchQuery = it },
-        isLoading = isLoading,
-        products = filteredProducts,
-        onProductClick = { product ->
-            navController?.navigate(route = "detail/${product.id}")
-        },
-        onContactUsClick = {
-            navController?.navigate(route = "hubungi_kami")
+        is ProductUiState.Error -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Error: ${state.message}", color = MaterialTheme.colorScheme.error)
+            }
         }
+        is ProductUiState.Success -> {
+            if (selectedCategoryId == null && state.categories.isNotEmpty()) {
+                selectedCategoryId = state.categories.first().id
+            }
+
+            val filteredByCategory = if (selectedCategoryId != null) {
+                state.products.filter { it.category_id == selectedCategoryId }
+            } else {
+                state.products
+            }
+
+            val filteredProducts = if (searchQuery.isBlank()) {
+                filteredByCategory
+            } else {
+                filteredByCategory.filter {
+                    it.name.contains(searchQuery, ignoreCase = true)
+                }
+            }
+
+            StatelessDaftarProduct(
+                categories = state.categories,
+                selectedCategoryId = selectedCategoryId,
+                onCategorySelected = { selectedCategoryId = it },
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                isLoading = false,
+                products = filteredProducts,
+                onProductClick = { product ->
+                    navController?.navigate("detail/${product.id}")
+                },
+                onContactUsClick = {
+                    navController?.navigate("hubungi_kami")
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun DaftarProductScreen(
+    navController: NavController? = null,
+    viewModel: ProductViewModel = viewModel()
+) {
+    DaftarProdukScreen(
+        navController = navController,
+        viewModel = viewModel
     )
 }
 
@@ -328,137 +333,6 @@ fun CategoryItem(
             fontSize = 14.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
         )
-    }
-}
-
-// ============================================================
-// ProductItemCard (tidak berubah)
-// ============================================================
-@Composable
-fun ProductItemCard(
-    product: Product,
-    onClick: () -> Unit = {}
-) {
-    val isDark = isSystemInDarkTheme()
-    val cardBg = if (isDark) MaterialTheme.colorScheme.surface else Color.White
-
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = cardBg
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        )
-    ) {
-        Column(
-            modifier = Modifier.background(cardBg)
-        ) {
-            if (isDark) {
-                Surface(
-                    color = Color.White,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(145.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_product_logo),
-                            contentDescription = product.name,
-                            modifier = Modifier.size(125.dp),
-                            contentScale = ContentScale.Fit
-                        )
-
-                        product.category?.let { category ->
-                            Surface(
-                                color = Color(0xFF76BA43),
-                                shape = RoundedCornerShape(6.dp),
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(top = 4.dp, end = 4.dp)
-                            ) {
-                                Text(
-                                    text = category.name,
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(155.dp)
-                        .background(Color.White),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_product_logo),
-                        contentDescription = product.name,
-                        modifier = Modifier.size(135.dp),
-                        contentScale = ContentScale.Fit
-                    )
-
-                    product.category?.let { category ->
-                        Surface(
-                            color = Color(0xFF76BA43),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 10.dp, end = 10.dp)
-                        ) {
-                            Text(
-                                text = category.name,
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .background(cardBg)
-                    .padding(
-                        start = 12.dp,
-                        end = 12.dp,
-                        bottom = 12.dp,
-                        top = if (isDark) 0.dp else 4.dp
-                    )
-            ) {
-                Text(
-                    text = product.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (isDark) Color.White else Color.Black
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "Rp ${product.price}",
-                    color = Color(0xFF3AA34B),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            }
-        }
     }
 }
 
